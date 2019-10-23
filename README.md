@@ -1,7 +1,9 @@
+# deepexi-com
 
+[CHANGELOG](./CHANGELOG.md)
 
-本地安装zookeeper
+## Guides
 
-
-
-run:IDE内右键运行StartupApplication类，启动程序。
+- [快速开始](./1.docs/guides/quickly_start.md)
+- [使用参考文档](./1.docs/guides/reference.md)
+- [开发参考文档](./1.docs/guides/dev_reference.md)

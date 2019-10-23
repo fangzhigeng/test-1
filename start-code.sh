@@ -1,52 +1,80 @@
 #!/bin/bash
 cd `dirname $0`
 
-img_mvn="maven:3.3.3-jdk-8"                 # docker image of maven
-m2_cache=~/.m2                              # the local maven cache dir
+source ./common.sh
+
+#----------------- 参数提取 start -----------------#
+output_log=
+build=
+port=8080
+version='1.0.0'
+
+while getopts lbp:v: opt
+do
+    case $opt in
+        l)
+            output_log=true
+            ;;
+        b)
+            build=true
+            ;;
+        p)
+            port=$OPTARG
+            ;;
+        v)
+            version=$OPTARG
+            ;;
+        ?)
+            error "Usage: %s: [-b] [-l] [-p port] [-v version] args\n" $0
+            exit 2
+            ;;
+    esac
+done
+#----------------- 参数提取 end -----------------#
+
+#----------------- 启动逻辑 start -----------------#
+project_name='deepexi-com'
+
 proj_home=$PWD                              # the project root dir
-img_output="deepexi/deepexi-com"         # output image tag
+img_output=$project_name:v$version          # output image tag
+container_name=$project_name                  # container name
 
-git pull  # should use git clone https://name:pwd@xxx.git
+h1 '准备启动应用'$project_name'（基于Docker）'
 
-echo "use docker maven"
-docker run --rm \
-   -v $m2_cache:/root/.m2 \
-   -v $proj_home:/usr/src/mymaven \
-   -w /usr/src/mymaven $img_mvn mvn clean package -U
+if [ ! -z $build ];then
+    PROJECT_HOME=$proj_home \
+    IMAGE_NAME=$img_output \
+    APP_NAME=$project_name \
+    VERSION=$version \
+    sh build.sh
 
-sudo mv $proj_home/deepexi-com-provider/target/deepexi-com-provider-*.jar $proj_home/deepexi-com-provider/target/demo.jar # 兼容所有sh脚本
-docker build -t $img_output .
+    if [ $? -eq 0 ];then
+        success '镜像构建成功'
+    else
+        error '镜像构建失败'
+        exit 2
+    fi
+fi
 
-mkdir -p $PWD/logs
-chmod 777 $PWD/logs
+info '删除已存在的容器' && docker rm -f $container_name
 
-# 删除容器
-docker rm -f deepexi-com &> /dev/null
+info '准备启动docker容器'
 
-version=`date "+%Y%m%d%H"`
+CONTAINER_NAME=$container_name \
+PORT=$port \
+IMG_NAME=$img_output \
+sh run.sh
 
-spring_datasource_url=jdbc:mysql://localhost:3306/deepexi-com?useUnicode=true\&characterEncoding=utf-8\&useSSL=false
+if [ $? -eq 0 ];then
+    success '容器启动成功'
+else
+    error '容器启动失败'
+    exit 3
+fi
 
-# 启动镜像
-docker run -d --restart=always \
-    --net=host \
-    --dns 114.114.114.114 \
-    --env 'TZ=Asia/Shanghai' \
-    -w /home \
-    -v /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro \
-    -v $PWD/logs:/home/logs \
-    --name deepexi-com deepexi/deepexi-com \
-    java \
-        -Djava.security.egd=file:/dev/./urandom \
-        -Duser.timezone=Asia/Shanghai \
-        -XX:+PrintGCDateStamps \
-        -XX:+PrintGCTimeStamps \
-        -XX:+PrintGCDetails \
-        -XX:+HeapDumpOnOutOfMemoryError \
-        -Xloggc:logs/gc_$version.log \
-        -jar /home/demo.jar \
-          --spring.profiles.active=prod \
-          --spring.datasource.url=$spring_datasource_url \
-          --spring.datasource.username=root \
-          --spring.datasource.password=my-secret-ab \
-          --dubbo.registry.address=zookeeper://127.0.0.1:2181
+if [ ! -z $output_log ];then
+    note '以下是docker容器启动输出，你可以通过ctrl-c中止它，这并不会导致容器停止'
+    docker logs -f $container_name
+fi
+
+#----------------- 启动逻辑 end -----------------#

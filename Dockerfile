@@ -1,11 +1,11 @@
-# 建议生产使用，ref: http://blog.tenxcloud.com/?p=1894
-FROM openjdk:8-jre-alpine
+FROM deepexi/java:v0.0.1
 
-USER root
+WORKDIR /home
 
-#中文乱码问题
-ENV LC_ALL en_US.UTF-8
-ENV LANG en_US.UTF-8
+COPY ./deepexi-com-provider/target/app.jar /home
 
-# Prepare by downloading dependencies
-COPY deepexi-com-provider/target/demo.jar /home/
+ADD entrypoint.sh /
+
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
